@@ -111,6 +111,7 @@ def sanitized_parameters(raw_parameters: dict[str, Any]) -> dict[str, Any]:
         "edge_radius_mm",
         "mesh_edge_radius_ratio",
         "input_series_resistance_mohm",
+        "output_series_resistance_ohm",
         "output_series_resistance_mohm",
         "input_series_matches_stage",
         "output_series_matches_stage",
@@ -172,7 +173,7 @@ def sanitized_parameters(raw_parameters: dict[str, Any]) -> dict[str, Any]:
         params["melf_stage_resistance_mohm"] = (10.0 ** float(params["melf_stage_resistance_log10_ohm"])) / 1e6
     params["melf_stage_resistance_mohm"] = clamp_number(params.get("melf_stage_resistance_mohm"), 0.001, 1_000_000.0, 12.0)
     params["melf_stage_resistance_log10_ohm"] = math.log10(params["melf_stage_resistance_mohm"] * 1e6)
-    params["melf_stage_parasitic_pf"] = clamp_number(params.get("melf_stage_parasitic_pf"), 0.01, 5.0, 0.3)
+    params["melf_stage_parasitic_pf"] = clamp_number(params.get("melf_stage_parasitic_pf"), 0.001, 5.0, 0.3)
     params["melf_substrate_epsr"] = clamp_number(params.get("melf_substrate_epsr"), 1.0, 1000.0, 9.8)
     params["melf_metal_fill_factor"] = clamp_number(params.get("melf_metal_fill_factor"), 0.0, 0.95, 0.5)
     params["input_series_matches_stage"] = params.get("input_series_matches_stage", True) is not False
@@ -184,16 +185,20 @@ def sanitized_parameters(raw_parameters: dict[str, Any]) -> dict[str, Any]:
         1_000_000.0,
         stage_mohm if params["input_series_matches_stage"] else 0.0,
     )
-    params["output_series_resistance_mohm"] = clamp_number(
-        params.get("output_series_resistance_mohm"),
+    if "output_series_resistance_ohm" not in raw_parameters and "output_series_resistance_mohm" in raw_parameters:
+        params["output_series_resistance_ohm"] = clamp_number(
+            raw_parameters.get("output_series_resistance_mohm"), 0.0, 1_000_000.0, 0.0
+        ) * 1e6
+    params["output_series_resistance_ohm"] = clamp_number(
+        params.get("output_series_resistance_ohm"),
         0.0,
-        1_000_000.0,
-        stage_mohm if params["output_series_matches_stage"] else 0.0,
+        1_000_000_000_000.0,
+        stage_mohm * 1e6 if params["output_series_matches_stage"] else 50.0,
     )
     if params["input_series_matches_stage"]:
         params["input_series_resistance_mohm"] = stage_mohm
     if params["output_series_matches_stage"]:
-        params["output_series_resistance_mohm"] = stage_mohm
+        params["output_series_resistance_ohm"] = stage_mohm * 1e6
     params["load_current_na"] = clamp_number(params.get("load_current_na"), 0.0, 1_000_000.0, 1.0)
     params["load_cable_length_m"] = clamp_number(params.get("load_cable_length_m"), 0.0, 10_000.0, 10.0)
     params["load_cable_impedance_ohm"] = clamp_number(params.get("load_cable_impedance_ohm"), 1.0, 10_000.0, 50.0)

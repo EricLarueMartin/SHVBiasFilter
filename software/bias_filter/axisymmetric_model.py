@@ -98,10 +98,12 @@ def normalize_parameters(p: dict[str, Any]) -> dict[str, Any]:
         else:
             p["input_series_resistance_mohm"] = max(0.0, float(p.get("input_series_resistance_mohm", 0.0)))
         if p["output_series_matches_stage"]:
-            p["output_series_resistance_mohm"] = p["melf_stage_resistance_mohm"]
+            p["output_series_resistance_ohm"] = p["melf_stage_resistance_mohm"] * 1e6
         else:
-            p["output_series_resistance_mohm"] = max(0.0, float(p.get("output_series_resistance_mohm", 0.0)))
-        edge_resistance_mohm = p["input_series_resistance_mohm"] + p["output_series_resistance_mohm"]
+            if "output_series_resistance_ohm" not in p and "output_series_resistance_mohm" in p:
+                p["output_series_resistance_ohm"] = float(p["output_series_resistance_mohm"]) * 1e6
+            p["output_series_resistance_ohm"] = max(0.0, float(p.get("output_series_resistance_ohm", 50.0)))
+        edge_resistance_mohm = p["input_series_resistance_mohm"] + p["output_series_resistance_ohm"] / 1e6
         total_resistance_mohm = stage_count * p["melf_stage_resistance_mohm"] + edge_resistance_mohm
         if total_resistance_mohm > 0:
             p["core_resistance_gohm"] = total_resistance_mohm / 1000.0
@@ -112,7 +114,9 @@ def normalize_parameters(p: dict[str, Any]) -> dict[str, Any]:
         p["input_series_matches_stage"] = p.get("input_series_matches_stage", True) is not False
         p["output_series_matches_stage"] = bool(p.get("output_series_matches_stage", False))
         p["input_series_resistance_mohm"] = max(0.0, float(p.get("input_series_resistance_mohm", 0.0)))
-        p["output_series_resistance_mohm"] = max(0.0, float(p.get("output_series_resistance_mohm", 0.0)))
+        if "output_series_resistance_ohm" not in p and "output_series_resistance_mohm" in p:
+            p["output_series_resistance_ohm"] = float(p["output_series_resistance_mohm"]) * 1e6
+        p["output_series_resistance_ohm"] = max(0.0, float(p.get("output_series_resistance_ohm", 50.0)))
     p["load_current_na"] = max(0.0, float(p.get("load_current_na", 1.0)))
     p["load_cable_length_m"] = max(0.0, float(p.get("load_cable_length_m", 10.0)))
     p["load_cable_impedance_ohm"] = max(1e-9, float(p.get("load_cable_impedance_ohm", 50.0)))

@@ -4,6 +4,10 @@
 
 The plate stack is an RC ladder. Each bias plate node sees capacitance to ground through the high-permittivity washer overlap, resistance to neighboring bias plates through the central resistive element, and unwanted parasitic capacitance to neighboring bias plates through the core material plus epoxy around the core.
 
+The input and inter-stage bias resistances are high-value controls expressed in Mohm. The output series resistance is a separate ohm-valued control because the normal readout-side value is 50 ohms; the web app defaults it to 50 ohms and passes that value to both the browser and backend SPICE models without a megaohm conversion.
+
+Manual numeric entries accept case-sensitive engineering prefixes with or without a space or trailing unit text: `T`, `G`, `M`, `k`, `m`, `u`/`µ`, `n`, `p`, and `f`. Thus `100M`, `100 M`, and `100 MOhm` all enter 100 Mohm in a resistance control, while `100f` enters 100 fF in a capacitance control. A value without a prefix remains in the control's displayed unit.
+
 At high frequency, the resistor no longer sets the divider by itself. The ratio of bias-to-bias parasitic capacitance to bias-to-ground capacitance becomes an important feedthrough estimate.
 
 ## Web Estimates

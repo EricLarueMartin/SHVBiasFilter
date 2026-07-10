@@ -62,6 +62,11 @@ def resistive_section_count(p: dict[str, Any]) -> int:
 def series_resistance_ohm(p: dict[str, Any], circuit: dict[str, float], prefix: str) -> float:
     if bool(p.get(f"{prefix}_series_matches_stage", False)):
         return max(0.0, float(circuit["stageResistanceOhm"]))
+    if prefix == "output":
+        if "output_series_resistance_ohm" in p:
+            return max(0.0, float(p["output_series_resistance_ohm"]))
+        # Compatibility with saved payloads from before output R used ohms.
+        return max(0.0, float(p.get("output_series_resistance_mohm", 0.0))) * 1e6
     return max(0.0, float(p.get(f"{prefix}_series_resistance_mohm", 0.0))) * 1e6
 
 

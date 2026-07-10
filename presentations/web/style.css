@@ -541,6 +541,20 @@ canvas {
   gap: 1rem;
 }
 
+.slide-copy-compact {
+  gap: 0.65rem;
+}
+
+.slide .slide-copy-compact h2 {
+  font-size: clamp(1.75rem, 3.2vw, 2.75rem);
+  line-height: 1.08;
+}
+
+.slide .slide-copy-compact li {
+  font-size: clamp(0.9rem, 1.4vw, 1.1rem);
+  line-height: 1.35;
+}
+
 .slide-figure {
   align-content: center;
 }

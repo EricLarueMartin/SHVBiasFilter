@@ -62,6 +62,23 @@ class FieldBackendTests(unittest.TestCase):
         self.assertAlmostEqual(calculated["parasiticPf"], 0.36632062406919774)
         self.assertAlmostEqual(entered["parasiticPf"], 0.5129042943308157)
 
+    def test_output_series_resistance_is_entered_in_ohms(self) -> None:
+        params = field_backend.sanitized_parameters({"output_series_resistance_ohm": 50.0})
+        circuit = spice_ladder.circuit_estimates(params)
+        self.assertEqual(spice_ladder.series_resistance_ohm(params, circuit, "output"), 50.0)
+
+        legacy = field_backend.sanitized_parameters({"output_series_resistance_mohm": 0.00005})
+        legacy_circuit = spice_ladder.circuit_estimates(legacy)
+        self.assertEqual(spice_ladder.series_resistance_ohm(legacy, legacy_circuit, "output"), 50.0)
+
+    def test_femtofarad_scale_capacitance_is_preserved(self) -> None:
+        params = field_backend.sanitized_parameters({
+            "melf_stage_parasitic_pf": 0.001,
+            "detector_capacitance_pf": 0.0001,
+        })
+        self.assertEqual(params["melf_stage_parasitic_pf"], 0.001)
+        self.assertEqual(params["detector_capacitance_pf"], 0.0001)
+
     def test_sanitized_parameters_derive_geometry_and_clamp_solver_cost(self) -> None:
         params = field_backend.sanitized_parameters(
             {
@@ -244,12 +261,12 @@ class FieldBackendTests(unittest.TestCase):
                 self.assertIn(payload["method"], {"internal-spice-style-ac-mna", "ngspice-batch-ac"})
                 self.assertIn("Tload", payload["netlist"])
                 self.assertIn("Rin", payload["netlist"])
-                self.assertNotIn("Rout", payload["netlist"])
+                self.assertIn("Rout", payload["netlist"])
                 self.assertEqual(payload["circuit"]["stages"], raw_parameters["plate_pairs"])
                 self.assertEqual(payload["circuit"]["internalResistiveSections"], raw_parameters["plate_pairs"] - 1)
-                self.assertEqual(payload["circuit"]["resistiveSections"], raw_parameters["plate_pairs"])
+                self.assertEqual(payload["circuit"]["resistiveSections"], raw_parameters["plate_pairs"] + 1)
                 self.assertGreater(payload["circuit"]["inputSeriesResistanceOhm"], 0.0)
-                self.assertEqual(payload["circuit"]["outputSeriesResistanceOhm"], 0.0)
+                self.assertEqual(payload["circuit"]["outputSeriesResistanceOhm"], 50.0)
                 self.assertGreater(payload["circuit"]["cableCapPf"], 0.0)
                 self.assertGreater(payload["circuit"]["detectorCapPf"], 0.0)
                 self.assertGreater(len(payload["samples"]), 10)

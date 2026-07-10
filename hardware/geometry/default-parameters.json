@@ -11,7 +11,7 @@
   "melf_substrate_epsr": 9.8,
   "melf_metal_fill_factor": 0.5,
   "input_series_resistance_mohm": 12.0,
-  "output_series_resistance_mohm": 0.0,
+  "output_series_resistance_ohm": 50.0,
   "input_series_matches_stage": true,
   "output_series_matches_stage": false,
   "load_current_na": 1.0,

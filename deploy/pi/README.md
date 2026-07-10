@@ -24,6 +24,8 @@ The included service file contains placeholders. The setup agent must render it 
 
 The backend accepts `--solver fd`, `--solver auto`, and `--solver fenicsx`. The Pi package stack for FEniCSx/DOLFINx/Gmsh is installed and the conforming worker is implemented. The service is still intentionally started with requested/effective default solver `fd` so normal page loads use the faster screening path; use the web dropdown's `FEniCSx required` option when deliberately running the conforming FEA worker.
 
+The systemd unit sets `MemorySwapMax=0`. The backend and all FEniCSx subprocesses therefore stay in the same no-swap cgroup, avoiding solver-driven swap writes on SD-card deployments. If a solve exhausts available RAM, it should fail rather than spill into swap; keep the worker count at one and reduce mesh density for oversized jobs.
+
 ## Reporting Access
 
 After setup, the agent must report the actual hostname or IP address it verified, using clickable links for the app and backend health endpoint. Do not commit those current-access details to this repository.

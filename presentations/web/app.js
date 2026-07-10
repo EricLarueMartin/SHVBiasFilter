@@ -10,7 +10,7 @@ const defaults = {
   melf_substrate_epsr: 9.8,
   melf_metal_fill_factor: 0.5,
   input_series_resistance_mohm: 12,
-  output_series_resistance_mohm: 0,
+  output_series_resistance_ohm: 50,
   input_series_matches_stage: true,
   output_series_matches_stage: false,
   load_current_na: 1,
@@ -142,7 +142,7 @@ const ids = [
   "melf_substrate_epsr",
   "melf_metal_fill_factor",
   "input_series_resistance_mohm",
-  "output_series_resistance_mohm",
+  "output_series_resistance_ohm",
   "load_current_na",
   "load_cable_length_m",
   "load_cable_impedance_ohm",
@@ -686,8 +686,43 @@ function syncDynamicRanges() {
   setRangeInputBounds("washer_od_mm", washerOdMin, Math.max(washerOdMin, params.tube_id_mm), 0.1);
 }
 
+const engineeringPrefixMultipliers = {
+  T: 1e12,
+  G: 1e9,
+  M: 1e6,
+  k: 1e3,
+  K: 1e3,
+  m: 1e-3,
+  u: 1e-6,
+  "µ": 1e-6,
+  "μ": 1e-6,
+  n: 1e-9,
+  p: 1e-12,
+  f: 1e-15
+};
+
+function controlInternalUnitInSi(id) {
+  if (id.endsWith("_resistance_mohm")) return 1e6;
+  if (id.endsWith("_resistance_ohm") || id.endsWith("_impedance_ohm")) return 1;
+  if (id.endsWith("_pf")) return 1e-12;
+  if (id.endsWith("_na")) return 1e-9;
+  if (id.endsWith("_mm")) return 1e-3;
+  if (id.endsWith("_length_m")) return 1;
+  if (id.endsWith("_voltage_v")) return 1;
+  return null;
+}
+
 function controlValueFromInput(id, value) {
-  return id === "plate_pairs" ? Number.parseInt(value, 10) : Number.parseFloat(value);
+  const text = String(value).trim();
+  if (id === "plate_pairs") return Number.parseInt(text, 10);
+  const match = text.match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*([TGMkKmuµμnpf])?\s*(?:[a-zA-ZΩΩ]+)?$/);
+  if (!match) return Number.NaN;
+  const number = Number.parseFloat(match[1]);
+  const prefix = match[2];
+  if (!prefix) return number;
+  const internalUnitInSi = controlInternalUnitInSi(id);
+  if (!Number.isFinite(internalUnitInSi)) return Number.NaN;
+  return number * engineeringPrefixMultipliers[prefix] / internalUnitInSi;
 }
 
 function updateMaterialSelectionsForControl(id) {
@@ -707,6 +742,13 @@ function updateMaterialSelectionsForControl(id) {
 function applyControlValue(id, value) {
   const parsed = controlValueFromInput(id, value);
   if (!Number.isFinite(parsed)) return;
+  const range = controlRange(id);
+  if (parsed < range.min || parsed > range.max) {
+    customControlRanges[id] = {
+      min: Math.min(range.min, parsed),
+      max: Math.max(range.max, parsed)
+    };
+  }
   params[id] = parsed;
   updateMaterialSelectionsForControl(id);
   normalizeParams();
@@ -725,9 +767,7 @@ function decimalsFromStep(step) {
 function formatManualControlValue(id, value) {
   if (!Number.isFinite(value)) return "";
   if (id === "plate_pairs") return `${Math.round(value)}`;
-  const input = document.getElementById(id);
-  const decimals = decimalsFromStep(input?.step);
-  return value.toFixed(decimals).replace(/\.?0+$/, "");
+  return Number(value.toPrecision(12)).toString();
 }
 
 function setupManualControlInput(id) {
@@ -748,12 +788,13 @@ function setupManualControlInput(id) {
   const manual = document.createElement("input");
   manual.id = `${id}_manual`;
   manual.className = "control-number";
-  manual.type = "number";
+  manual.type = "text";
+  manual.inputMode = "decimal";
   manual.step = input.step || "any";
   manual.min = input.min;
   manual.max = input.max;
   manual.value = formatManualControlValue(id, params[id]);
-  manual.title = "Enter an exact value.";
+  manual.title = "Enter an exact value. Engineering prefixes T, G, M, k, m, u/µ, n, p, and f are supported.";
   valueWrap.appendChild(manual);
 
   manual.addEventListener("change", () => applyControlValue(id, manual.value));
@@ -780,8 +821,8 @@ function rangeEditorElement() {
   editor.className = "range-editor";
   editor.innerHTML = `
     <strong>Slider range</strong>
-    <label>Min <input id="rangeEditorMin" type="number" step="any"></label>
-    <label>Max <input id="rangeEditorMax" type="number" step="any"></label>
+    <label>Min <input id="rangeEditorMin" type="text" inputmode="decimal"></label>
+    <label>Max <input id="rangeEditorMax" type="text" inputmode="decimal"></label>
     <div>
       <button type="submit">Apply</button>
       <button type="button" id="rangeEditorReset">Reset</button>
@@ -804,8 +845,8 @@ function rangeEditorElement() {
   editor.addEventListener("submit", (event) => {
     event.preventDefault();
     const id = editor.dataset.controlId;
-    const min = Number.parseFloat(document.getElementById("rangeEditorMin").value);
-    const max = Number.parseFloat(document.getElementById("rangeEditorMax").value);
+    const min = controlValueFromInput(id, document.getElementById("rangeEditorMin").value);
+    const max = controlValueFromInput(id, document.getElementById("rangeEditorMax").value);
     if (!id || !Number.isFinite(min) || !Number.isFinite(max)) return;
     customControlRanges[id] = { min: Math.min(min, max), max: Math.max(min, max) };
     closeRangeEditor();
@@ -984,8 +1025,8 @@ function inputSeriesResistanceOhm(circuit, p) {
 }
 
 function outputSeriesResistanceOhm(circuit, p) {
-  const mohms = p.output_series_matches_stage ? circuit.stageResistanceOhm / 1e6 : p.output_series_resistance_mohm;
-  return Math.max(0, Number(mohms) || 0) * 1e6;
+  const ohms = p.output_series_matches_stage ? circuit.stageResistanceOhm : p.output_series_resistance_ohm;
+  return Math.max(0, Number(ohms) || 0);
 }
 
 function activeSeriesSectionCount(circuit, p, includeOutput = true) {
@@ -1000,10 +1041,10 @@ function activeSeriesSectionCount(circuit, p, includeOutput = true) {
 function totalCoreResistanceOhm(p) {
   if (usesDirectStageCircuit(p)) {
     const stageResistance = directStageResistanceOhm(p);
-    const edgeResistanceMohm = (p.input_series_matches_stage ? stageResistance / 1e6 : Math.max(0, p.input_series_resistance_mohm || 0))
-      + (p.output_series_matches_stage ? stageResistance / 1e6 : Math.max(0, p.output_series_resistance_mohm || 0));
+    const inputResistanceOhm = p.input_series_matches_stage ? stageResistance : Math.max(0, p.input_series_resistance_mohm || 0) * 1e6;
+    const outputResistanceOhm = p.output_series_matches_stage ? stageResistance : Math.max(0, p.output_series_resistance_ohm || 0);
     const internalStageCount = Math.max(0, p.plate_pairs - 1);
-    const totalOhm = internalStageCount * stageResistance + edgeResistanceMohm * 1e6;
+    const totalOhm = internalStageCount * stageResistance + inputResistanceOhm + outputResistanceOhm;
     return totalOhm > 0 ? totalOhm : Number.NaN;
   }
   return coreResistanceForLengthOhm(p, stackLength(p));
@@ -1046,9 +1087,10 @@ function formatControlOutput(id, value) {
   if (id === "core_volume_resistivity_log10_ohm_cm") {
     return formatResistivity(10 ** value);
   }
-  if (id === "melf_stage_resistance_mohm" || id === "input_series_resistance_mohm" || id === "output_series_resistance_mohm") {
+  if (id === "melf_stage_resistance_mohm" || id === "input_series_resistance_mohm") {
     return formatResistance(value * 1e6);
   }
+  if (id === "output_series_resistance_ohm") return formatResistance(value);
   if (id === "melf_stage_parasitic_pf") {
     return formatCapacitance(value);
   }
@@ -1088,7 +1130,8 @@ function formatCapacitance(pf) {
   if (pf >= 1000) return `${(pf / 1000).toLocaleString(undefined, { maximumFractionDigits: 2 })} nF`;
   if (pf >= 100) return `${pf.toLocaleString(undefined, { maximumFractionDigits: 0 })} pF`;
   if (pf >= 10) return `${pf.toLocaleString(undefined, { maximumFractionDigits: 1 })} pF`;
-  return `${pf.toLocaleString(undefined, { maximumFractionDigits: 2 })} pF`;
+  if (pf >= 1) return `${pf.toLocaleString(undefined, { maximumFractionDigits: 2 })} pF`;
+  return `${(pf * 1000).toLocaleString(undefined, { maximumFractionDigits: 2 })} fF`;
 }
 
 function formatResistance(ohms) {
@@ -1984,7 +2027,7 @@ function normalizeParams() {
     "load_cable_velocity_factor",
     "detector_capacitance_pf",
     "input_series_resistance_mohm",
-    "output_series_resistance_mohm",
+    "output_series_resistance_ohm",
     "ferrite_epsr",
     "melf_substrate_epsr",
     "melf_metal_fill_factor",
@@ -2007,12 +2050,12 @@ function normalizeParams() {
   }
   const edgeRange = controlRange("edge_diameter_percent", 0, 100);
   const rfRange = controlRange("rf_compare_frequency_log10_mhz", -3, 4);
-  const melfRRange = controlRange("melf_stage_resistance_mohm", 1, 12);
-  const melfCRange = controlRange("melf_stage_parasitic_pf", 0.01, 5);
+  const melfRRange = controlRange("melf_stage_resistance_mohm", 1, 1000);
+  const melfCRange = controlRange("melf_stage_parasitic_pf", 0.001, 5);
   const melfSubstrateRange = controlRange("melf_substrate_epsr", 3, 30);
   const melfFillRange = controlRange("melf_metal_fill_factor", 0, 0.9);
-  const inputSeriesRange = controlRange("input_series_resistance_mohm", 0, 12);
-  const outputSeriesRange = controlRange("output_series_resistance_mohm", 0, 12);
+  const inputSeriesRange = controlRange("input_series_resistance_mohm", 0, 1000);
+  const outputSeriesRange = controlRange("output_series_resistance_ohm", 0, 1000);
   const plateSigmaRange = controlRange("plate_conductivity_log10_s_per_m", 5, 8.2);
   const tubeSigmaRange = controlRange("tube_conductivity_log10_s_per_m", 5, 8.2);
   const plateMuRange = controlRange("plate_relative_permeability", 1, 50);
@@ -2036,9 +2079,9 @@ function normalizeParams() {
   params.melf_substrate_epsr = clamp(params.melf_substrate_epsr, melfSubstrateRange.min, melfSubstrateRange.max);
   params.melf_metal_fill_factor = clamp(params.melf_metal_fill_factor, melfFillRange.min, melfFillRange.max);
   if (!Number.isFinite(params.input_series_resistance_mohm)) params.input_series_resistance_mohm = params.input_series_matches_stage ? matchedSeriesResistanceMohm(params) : 0;
-  if (!Number.isFinite(params.output_series_resistance_mohm)) params.output_series_resistance_mohm = params.output_series_matches_stage ? matchedSeriesResistanceMohm(params) : 0;
+  if (!Number.isFinite(params.output_series_resistance_ohm)) params.output_series_resistance_ohm = params.output_series_matches_stage ? stageResistanceReferenceOhm(params) : 50;
   params.input_series_resistance_mohm = clamp(params.input_series_resistance_mohm, inputSeriesRange.min, inputSeriesRange.max);
-  params.output_series_resistance_mohm = clamp(params.output_series_resistance_mohm, outputSeriesRange.min, outputSeriesRange.max);
+  params.output_series_resistance_ohm = clamp(params.output_series_resistance_ohm, outputSeriesRange.min, outputSeriesRange.max);
   params.plate_conductivity_log10_s_per_m = clamp(params.plate_conductivity_log10_s_per_m, plateSigmaRange.min, plateSigmaRange.max);
   params.tube_conductivity_log10_s_per_m = clamp(params.tube_conductivity_log10_s_per_m, tubeSigmaRange.min, tubeSigmaRange.max);
   params.plate_relative_permeability = clamp(params.plate_relative_permeability, plateMuRange.min, plateMuRange.max);
@@ -2063,7 +2106,7 @@ function normalizeParams() {
   applyDerivedGeometry(params);
   applyWasherGeometry(params);
   if (params.input_series_matches_stage) params.input_series_resistance_mohm = clamp(matchedSeriesResistanceMohm(params), inputSeriesRange.min, inputSeriesRange.max);
-  if (params.output_series_matches_stage) params.output_series_resistance_mohm = clamp(matchedSeriesResistanceMohm(params), outputSeriesRange.min, outputSeriesRange.max);
+  if (params.output_series_matches_stage) params.output_series_resistance_ohm = clamp(stageResistanceReferenceOhm(params), outputSeriesRange.min, outputSeriesRange.max);
   applyDerivedElectrical(params);
 }
 
@@ -2138,8 +2181,8 @@ function syncControls() {
   if (groundThicknessManual) groundThicknessManual.disabled = params.ground_matches_bias_thickness;
   const inputSeriesInput = document.getElementById("input_series_resistance_mohm");
   const inputSeriesManual = document.getElementById("input_series_resistance_mohm_manual");
-  const outputSeriesInput = document.getElementById("output_series_resistance_mohm");
-  const outputSeriesManual = document.getElementById("output_series_resistance_mohm_manual");
+  const outputSeriesInput = document.getElementById("output_series_resistance_ohm");
+  const outputSeriesManual = document.getElementById("output_series_resistance_ohm_manual");
   if (inputSeriesInput) inputSeriesInput.disabled = params.input_series_matches_stage;
   if (inputSeriesManual) inputSeriesManual.disabled = params.input_series_matches_stage;
   if (outputSeriesInput) outputSeriesInput.disabled = params.output_series_matches_stage;

@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SHV Bias Filter</title>
-    <link rel="stylesheet" href="style.css?v=2026-07-07-spice-ladder-backend">
-    <script defer src="app.js?v=2026-07-09-fea-cpar-explain"></script>
+    <link rel="stylesheet" href="style.css?v=2026-07-10-fea-sanity-type-2">
+    <script defer src="app.js?v=2026-07-10-engineering-inputs-femto-2"></script>
   </head>
   <body>
     <header class="topbar">
@@ -34,16 +34,16 @@
             <h2>Electrical</h2>
             <label>Bias voltage <output id="bias_voltage_v_out"></output><input id="bias_voltage_v" type="range" min="1000" max="10000" step="250"></label>
             <label id="core_resistivity_control" title="Log slider: resistance is derived as resistivity times core length divided by core area"><span>Core volume resistivity</span><output id="core_volume_resistivity_log10_ohm_cm_out"></output><input id="core_volume_resistivity_log10_ohm_cm" type="range" min="-3" max="12" step="0.1"></label>
-            <label id="melf_stage_resistance_control" hidden title="Stage resistance is entered directly instead of derived from bulk resistivity and geometry"><span>Direct stage R</span><output id="melf_stage_resistance_mohm_out"></output><input id="melf_stage_resistance_mohm" type="range" min="1" max="12" step="0.1"></label>
-            <label title="Series resistance before the first bias plate. Zero ohms makes the first plate an ideal driven node."><span>Input series R</span><output id="input_series_resistance_mohm_out"></output><input id="input_series_resistance_mohm" type="range" min="0" max="12" step="0.1"></label>
+            <label id="melf_stage_resistance_control" hidden title="Stage resistance is entered directly instead of derived from bulk resistivity and geometry"><span>Direct stage R</span><output id="melf_stage_resistance_mohm_out"></output><input id="melf_stage_resistance_mohm" type="range" min="1" max="1000" step="1"></label>
+            <label title="Series resistance before the first bias plate. Zero ohms makes the first plate an ideal driven node."><span>Input series R</span><output id="input_series_resistance_mohm_out"></output><input id="input_series_resistance_mohm" type="range" min="0" max="1000" step="1"></label>
             <label class="check" title="Set input series resistance equal to the current stage resistance."><input id="input_series_matches_stage" type="checkbox"> Input R = stage R</label>
-            <label title="Series resistance after the final bias plate and before the cable/load. Zero ohms connects the load directly to the final plate."><span>Output series R</span><output id="output_series_resistance_mohm_out"></output><input id="output_series_resistance_mohm" type="range" min="0" max="12" step="0.1"></label>
+            <label title="Series resistance after the final bias plate and before the cable/load, entered in ohms. Zero ohms connects the load directly to the final plate."><span>Output series R</span><output id="output_series_resistance_ohm_out"></output><input id="output_series_resistance_ohm" type="range" min="0" max="1000" step="1"></label>
             <label class="check" title="Set output series resistance equal to the current stage resistance."><input id="output_series_matches_stage" type="checkbox"> Output R = stage R</label>
             <label title="Load conductance for the admittance estimate is Iload / Vbias."><span>Load current</span><output id="load_current_na_out"></output><input id="load_current_na" type="range" min="0" max="10" step="0.01"></label>
             <label title="Coax length connected at the filter output. The loaded ladder treats this as lumped cable capacitance."><span>Load cable length</span><output id="load_cable_length_m_out"></output><input id="load_cable_length_m" type="range" min="0" max="30" step="0.5"></label>
             <label title="Characteristic impedance used to infer lumped cable capacitance from length and velocity factor."><span>Load cable Z<sub>0</sub></span><output id="load_cable_impedance_ohm_out"></output><input id="load_cable_impedance_ohm" type="range" min="25" max="125" step="1"></label>
             <label title="Coax velocity factor used for C = length / (Z0 vf c)."><span>Load cable VF</span><output id="load_cable_velocity_factor_out"></output><input id="load_cable_velocity_factor" type="range" min="0.3" max="0.95" step="0.01"></label>
-            <label title="Detector capacitance connected at the filter output."><span>Detector C</span><output id="detector_capacitance_pf_out"></output><input id="detector_capacitance_pf" type="range" min="0" max="100" step="0.5"></label>
+            <label title="Detector capacitance connected at the filter output."><span>Detector C</span><output id="detector_capacitance_pf_out"></output><input id="detector_capacitance_pf" type="range" min="0" max="100" step="0.001"></label>
             <label>Core material
               <select id="core_material">
                 <option value="type61">Fair-Rite 61 NiZn</option>
@@ -96,7 +96,7 @@
               </select>
             </label>
             <label id="core_epsr_control"><span>Conductor &epsilon;<sub>r</sub></span><output id="ferrite_epsr_out"></output><input id="ferrite_epsr" type="range" min="2" max="120" step="0.1"></label>
-            <label id="melf_stage_parasitic_control" hidden title="Entered resistor/package bias-to-bias capacitance. Epoxy coupling around the package is calculated separately."><span>Resistor C<sub>par</sub></span><output id="melf_stage_parasitic_pf_out"></output><input id="melf_stage_parasitic_pf" type="range" min="0.01" max="5" step="0.01"></label>
+            <label id="melf_stage_parasitic_control" hidden title="Entered resistor/package bias-to-bias capacitance. Epoxy coupling around the package is calculated separately."><span>Resistor C<sub>par</sub></span><output id="melf_stage_parasitic_pf_out"></output><input id="melf_stage_parasitic_pf" type="range" min="0.001" max="5" step="0.001"></label>
             <label id="melf_substrate_epsr_control" hidden title="Ceramic substrate permittivity for the geometric MELF capacitance model. Alumina is a reasonable default."><span>MELF substrate &epsilon;<sub>r</sub></span><output id="melf_substrate_epsr_out"></output><input id="melf_substrate_epsr" type="range" min="3" max="30" step="0.1"></label>
             <label id="melf_metal_fill_factor_control" hidden title="Fractional metal-film shielding estimate. Effective core permittivity is substrate epsr divided by 1 - fill factor."><span>MELF film fill</span><output id="melf_metal_fill_factor_out"></output><input id="melf_metal_fill_factor" type="range" min="0" max="0.9" step="0.01"></label>
             <label><span>Washer &epsilon;<sub>r</sub></span><output id="washer_epsr_out"></output><input id="washer_epsr" type="range" min="2" max="200" step="0.1"></label>
@@ -467,7 +467,7 @@
           </figure>
         </article>
         <article class="slide slide-visual">
-          <div class="slide-copy">
+          <div class="slide-copy slide-copy-compact">
             <h2>FEA Capacitance Sanity Check</h2>
             <ul>
               <li>Compare analytic washer-overlap C<sub>g,total</sub> to FEA energy-extracted C<sub>g,total</sub>.</li>
